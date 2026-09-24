@@ -487,12 +487,6 @@ extern int WINAPI GdipDrawImageRectI(void*, void*, int, int, int, int);
 extern int WINAPI GdipDisposeImage(void*);
 extern int WINAPI GdipSetInterpolationMode(void*, int);
 
-// Pen strokes for the caption glyphs -- thin outlines matching Windows' native
-// (and WezTerm's) vector caption buttons, not a heavy filled icon.
-extern int WINAPI GdipCreatePen1(unsigned int, float, int, void**);
-extern int WINAPI GdipDeletePen(void*);
-extern int WINAPI GdipDrawLineI(void*, void*, int, int, int, int);
-extern int WINAPI GdipDrawRectangleI(void*, void*, int, int, int, int);
 
 #define CB_COUNT 3   // minimize, maximize/restore, close
 

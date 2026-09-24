@@ -44,7 +44,7 @@ Built for Windows 11, which is where all of it is developed and tested. The acry
 
 ## Install
 
-Download `kitty-setup.exe` from the [latest release](https://github.com/ecstra/win-kitty/releases/latest) and run it. It asks for administrator rights, installs to `C:\Program Files\kitty`, and offers to put kitty on your PATH, add the Explorer menu entry, and create a desktop shortcut.
+Download `kitty-setup.exe` from the [latest release](https://github.com/ecstra/win-kitty/releases/latest) and run it. It installs for the current Windows account under `%LOCALAPPDATA%\Programs\kitty` and does not require administrator rights. You can add kitty to your user PATH, add the Explorer menu entry for your account, and create a desktop shortcut.
 
 Nothing else is needed. Python, every MinGW DLL and the terminfo are bundled, and each build is smoke tested against a cleaned PATH so a missing dependency fails the build rather than you.
 

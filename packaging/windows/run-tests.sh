@@ -7,8 +7,8 @@
 # reason, so the whole suite runs, Go tests included.
 #
 # Skips are printed by the runner rather than hidden in a list here, so what is
-# not covered stays visible in the CI log. WINDOWS_TODO records the gaps behind
-# the ones that cannot pass yet.
+# not covered stays visible in the CI log. docs/windows-port.md records the
+# known platform gaps and the features that have not been tested yet.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -23,11 +23,13 @@ if timeout "$TIMEOUT" "$PY" test.py; then
     echo
     echo "Test suite passed"
     exit 0
+else
+    # Capture the command's status inside the else branch. After a failed `if`
+    # with no matching branch, Bash reports the compound `if` status as zero.
+    rc=$?
+    echo
+    if [ "$rc" -eq 124 ]; then
+        echo "TIMED OUT after ${TIMEOUT}s"
+    fi
+    exit "$rc"
 fi
-
-rc=$?
-echo
-if [ "$rc" -eq 124 ]; then
-    echo "TIMED OUT after ${TIMEOUT}s"
-fi
-exit "$rc"

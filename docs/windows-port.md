@@ -19,12 +19,12 @@ Bug reports for the Windows build belong on the fork at https://github.com/ecstr
 
 ## Installing
 
-Run `dist/kitty-setup.exe`. It asks for administrator rights, because it installs for all users and writes to `C:\Program Files\kitty`.
+Run `dist/kitty-setup.exe`. It installs for the current Windows account under `%LOCALAPPDATA%\Programs\kitty` and does not require administrator rights.
 
 The installer offers three optional tasks.
 
-- Add kitty to your PATH: puts `<install>\bin` on the system PATH so `kitty` and `kitten` work in any terminal.
-- Add "Open in kitty" to the Explorer right click menu: appears in the main Windows 11 menu, and under "Show more options" as well. Both are installed because Windows 11 reads the two from different places, see [windows-internals.md](windows-internals.md).
+- Add kitty to your PATH: puts `<install>\bin` on your user PATH so `kitty` and `kitten` work in your terminals.
+- Add "Open in kitty" to the Explorer right-click menu for your account: appears in the main Windows 11 menu, and under "Show more options" as well. Both are installed because Windows 11 reads the two from different places, see [windows-internals.md](windows-internals.md).
 - Create a desktop shortcut: off by default.
 
 A Start menu entry is always created. To install without any prompts, run it with the silent flags.

@@ -753,7 +753,9 @@ static void styleTitlebar(_GLFWwindow* window) {
     _glfw.win32.dwmapi.SetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof(dark));
     DWORD round = 2 /* DWMWCP_ROUND */;
     _glfw.win32.dwmapi.SetWindowAttribute(hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &round, sizeof(round));
-    COLORREF border = 0x00000000 /* thin black edge, like a normal window */;
+    // Match WezTerm and other native apps: do not force a border colour, let DWM
+    // use the default (subtle system border, accent-tinted while focused).
+    COLORREF border = 0xFFFFFFFF /* DWMWA_COLOR_DEFAULT */;
     _glfw.win32.dwmapi.SetWindowAttribute(hwnd, 34 /* DWMWA_BORDER_COLOR */, &border, sizeof(border));
     // Repaint the custom caption buttons so their glyph colour tracks a caption
     // colour change (e.g. a live theme preview restyles via set_os_window_chrome),

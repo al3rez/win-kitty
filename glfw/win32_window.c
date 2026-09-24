@@ -486,39 +486,37 @@ extern int WINAPI GdipCreateBitmapFromScan0(int, int, int, int, void*, void**);
 extern int WINAPI GdipDrawImageRectI(void*, void*, int, int, int, int);
 extern int WINAPI GdipDisposeImage(void*);
 extern int WINAPI GdipSetInterpolationMode(void*, int);
-#include "caption_icons.h"
+
+// Pen strokes for the caption glyphs -- thin outlines matching Windows' native
+// (and WezTerm's) vector caption buttons, not a heavy filled icon.
+extern int WINAPI GdipCreatePen1(unsigned int, float, int, void**);
+extern int WINAPI GdipDeletePen(void*);
+extern int WINAPI GdipDrawLineI(void*, void*, int, int, int, int);
+extern int WINAPI GdipDrawRectangleI(void*, void*, int, int, int, int);
 
 #define CB_COUNT 3   // minimize, maximize/restore, close
 
-// Lazily create (and cache) the GDI+ bitmap for a caption icon from its embedded
-// BGRA pixels. idx: 0 minimize, 1 maximize, 2 restore, 3 close.
-static void* cbIconBitmap(int idx, bool dark) {
-    static void* cacheLight[4] = { NULL, NULL, NULL, NULL };
-    static void* cacheDark[4] = { NULL, NULL, NULL, NULL };
-    if (idx < 0 || idx > 3) return NULL;
-    void** cache = dark ? cacheDark : cacheLight;
-    if (!cache[idx]) {
-        const unsigned char* data[4] = { CB_ICON_MIN, CB_ICON_MAX, CB_ICON_RESTORE, CB_ICON_CLOSE };
-        void* bmp = NULL;
-        const void* pixels = data[idx];
-        if (dark) {
-            // The embedded glyphs are white; zero the colour channels (keep alpha)
-            // to make them dark for light captions. GdipCreateBitmapFromScan0
-            // references (does not copy) the pixels, so this copy is kept alive for
-            // the process by the cache. Layout is BGRA, alpha at byte 3.
-            size_t n = (size_t) CB_ICON_W * CB_ICON_H * 4;
-            unsigned char* copy = (unsigned char*) malloc(n);
-            if (!copy) return NULL;
-            memcpy(copy, data[idx], n);
-            for (size_t p = 0; p < n; p += 4) { copy[p] = 0; copy[p + 1] = 0; copy[p + 2] = 0; }
-            pixels = copy;
-        }
-        // PixelFormat32bppARGB = 0x0026200A
-        if (GdipCreateBitmapFromScan0(CB_ICON_W, CB_ICON_H, CB_ICON_W * 4, 0x0026200A, (void*) pixels, &bmp) == 0)
-            cache[idx] = bmp;
-        else if (dark) free((void*) pixels);
+// Draw a caption glyph as thin strokes inside the box [gx,gy,gsz]. btn: 0
+// minimize, 1 maximize/restore, 2 close. Matches the Windows caption glyphs:
+// a middle bar, a square outline (two offset squares when maximized), an X.
+static void cbDrawGlyph(void* g, int btn, bool maximized, int gx, int gy, int gsz, unsigned int argb, float penw) {
+    void* pen = NULL;
+    if (GdipCreatePen1(argb, penw, 2 /* UnitPixel */, &pen) != 0) return;
+    int x0 = gx, y0 = gy, x1 = gx + gsz, y1 = gy + gsz;
+    if (btn == 0) {                         // minimize: horizontal bar
+        int my = gy + gsz / 2;
+        GdipDrawLineI(g, pen, x0, my, x1, my);
+    } else if (btn == 1 && !maximized) {    // maximize: single square
+        GdipDrawRectangleI(g, pen, x0, y0, gsz - 1, gsz - 1);
+    } else if (btn == 1) {                  // restore: two offset squares
+        int o = (gsz * 3) / 10, s = gsz - o;
+        GdipDrawRectangleI(g, pen, x0, y0 + o, s - 1, s - 1);   // front (lower-left)
+        GdipDrawRectangleI(g, pen, x0 + o, y0, s - 1, s - 1);   // back  (upper-right)
+    } else {                                // close: X
+        GdipDrawLineI(g, pen, x0, y0, x1, y1);
+        GdipDrawLineI(g, pen, x1, y0, x0, y1);
     }
-    return cache[idx];
+    GdipDeletePen(pen);
 }
 
 // A light caption (near-white theme background) needs dark button glyphs. The
@@ -604,20 +602,16 @@ static void cbPaint(HWND overlay) {
                 }
                 GdipDeleteBrush(brush);
             }
-            // glyph: the rasterized Material Symbols icon, scaled and centered
-            //  0 minimize, 1 maximize (or 2 restore when zoomed), 3 close
-            int iconIdx = (i == 0) ? 0
-                        : (i == 1) ? (IsZoomed(st->owner->win32.handle) ? 2 : 1)
-                                   : 3;
-            // Dark glyphs on a light caption; but keep the close glyph white while
-            // its hover fill is red so the X stays visible.
-            void* bmp = cbIconBitmap(iconIdx, light_caption && !(i == 2 && hot));
-            if (bmp) {
-                int gsz = MulDiv(10, dpi, 96);   // Win11 caption glyph size
-                int gx = bx + (bw - gsz) / 2;
-                int gy = top + (bh - gsz) / 2;
-                GdipDrawImageRectI(g, bmp, gx, gy, gsz, gsz);
-            }
+            // glyph: thin strokes in the caption foreground colour. Dark on a
+            // light caption; the close glyph stays white over its red hover.
+            bool dark_glyph = light_caption && !(i == 2 && hot);
+            unsigned int fg = dark_glyph ? 0xFF000000u : 0xFFFFFFFFu;
+            int gsz = MulDiv(10, dpi, 96);   // Win11 caption glyph size
+            int gx = bx + (bw - gsz) / 2;
+            int gy = top + (bh - gsz) / 2;
+            float penw = (float) dpi / 96.0f;   // ~1px logical, crisp thin stroke
+            if (penw < 1.0f) penw = 1.0f;
+            cbDrawGlyph(g, i, IsZoomed(st->owner->win32.handle), gx, gy, gsz, fg, penw);
         }
         GdipDeleteGraphics(g);
     }

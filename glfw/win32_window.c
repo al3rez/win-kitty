@@ -623,8 +623,10 @@ static void cbPaint(HWND overlay) {
             int gsz = MulDiv(10, dpi, 96);   // Win11 caption glyph size
             int gx = bx + (bw - gsz) / 2;
             int gy = top + (bh - gsz) / 2;
-            float penw = (float) dpi / 96.0f;   // ~1px logical, crisp thin stroke
-            if (penw < 1.0f) penw = 1.0f;
+            // Match WezTerm's line_width = underline_height.max(2): >= 2px so the
+            // diagonal close X reads as solid as the straight min/max strokes.
+            float penw = 1.5f * (float) dpi / 96.0f;
+            if (penw < 2.0f) penw = 2.0f;
             cbDrawGlyph(g, i, IsZoomed(st->owner->win32.handle), gx, gy, gsz, fg, penw);
         }
         GdipDeleteGraphics(g);

@@ -536,10 +536,13 @@ static const wchar_t* CAPTION_CLASS = L"kittyCaptionButtons";
 
 static void cbLayout(HWND overlay, int* bw, int* bh, int* gap, int* pad) {
     UINT dpi = windowDpi(overlay);
-    // 30px square buttons in a 40px strip -> 5px vertical margin; pad matches it
-    // so the top and right gaps are equal. Glyphs stay small (see cbPaint).
-    *bw = *bh = MulDiv(30, dpi, 96);
-    *gap = MulDiv(4, dpi, 96); *pad = MulDiv(5, dpi, 96);
+    // Windows 11 native caption buttons: 46 logical px wide, full caption
+    // height, contiguous (no gap), flush to the right edge (no padding).
+    *bw = MulDiv(46, dpi, 96);
+    RECT rc; GetClientRect(overlay, &rc);
+    int h = rc.bottom - rc.top;
+    *bh = h > 0 ? h : titlebarHeightPx(overlay);
+    *gap = 0; *pad = 0;
 }
 static int cbHitTest(HWND overlay, int x, int y) {
     int bw, bh, gap, pad; cbLayout(overlay, &bw, &bh, &gap, &pad);
@@ -578,26 +581,24 @@ static void cbPaint(HWND overlay) {
         GdipSetSmoothingMode(g, 4 /* antialias */);
         GdipSetInterpolationMode(g, 7 /* HighQualityBicubic: crisp icon downscale */);
         int top = (H - bh) / 2;
-        float rad = (float) MulDiv(7, dpi, 96);
         bool light_caption = cbCaptionIsLight();
         for (int i = 0; i < CB_COUNT; i++) {
             int bx = pad + i * (bw + gap);
             bool hot = st->hovered == i;
-            // Always fill the button rect: a base alpha of 1 keeps the WHOLE
-            // button clickable/hoverable (a layered window is click-through only
-            // where alpha == 0), while hover shows a clear background.
-            ULONG col = hot ? ((i == 2) ? 0xF0E81123u /* red */ : 0x55FFFFFFu /* ~33% white */)
-                            : 0x01FFFFFFu /* invisible but hit-testable */;
+            bool down = st->pressed == i;
+            // Windows 11 caption buttons: a flat, full-height rectangle that
+            // fills on hover. min/max use a subtle neutral wash, close turns red.
+            // A base alpha of 1 keeps the whole button hit-testable (a layered
+            // window is click-through only where alpha == 0).
+            ULONG col;
+            if (i == 2) col = down ? 0xFFC84C3Fu : hot ? 0xFFC42B1Cu : 0x01FFFFFFu; // Win11 red
+            else if (light_caption) col = down ? 0x28000000u : hot ? 0x18000000u : 0x01FFFFFFu;
+            else col = down ? 0x28FFFFFFu : hot ? 0x18FFFFFFu : 0x01FFFFFFu;
             void* brush = NULL;
             if (GdipCreateSolidFill(col, &brush) == 0) {
                 void* path = NULL;
                 if (GdipCreatePath(0, &path) == 0) {
-                    int d = (int)(rad * 2);
-                    GdipAddPathArcI(path, bx, top, d, d, 180, 90);
-                    GdipAddPathArcI(path, bx + bw - d, top, d, d, 270, 90);
-                    GdipAddPathArcI(path, bx + bw - d, top + bh - d, d, d, 0, 90);
-                    GdipAddPathArcI(path, bx, top + bh - d, d, d, 90, 90);
-                    GdipClosePathFigure(path);
+                    GdipAddPathRectangleI(path, bx, top, bw, bh);
                     GdipFillPath(g, brush, path);
                     GdipDeletePath(path);
                 }
@@ -612,9 +613,9 @@ static void cbPaint(HWND overlay) {
             // its hover fill is red so the X stays visible.
             void* bmp = cbIconBitmap(iconIdx, light_caption && !(i == 2 && hot));
             if (bmp) {
-                int gsz = MulDiv(16, dpi, 96);   // glyph box within the 30px button
+                int gsz = MulDiv(10, dpi, 96);   // Win11 caption glyph size
                 int gx = bx + (bw - gsz) / 2;
-                int gy = top + (bh - gsz) / 2 + MulDiv(1, dpi, 96);  // +1px: sits 1px high otherwise
+                int gy = top + (bh - gsz) / 2;
                 GdipDrawImageRectI(g, bmp, gx, gy, gsz, gsz);
             }
         }

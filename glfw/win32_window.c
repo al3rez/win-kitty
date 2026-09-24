@@ -490,25 +490,45 @@ extern int WINAPI GdipSetInterpolationMode(void*, int);
 
 #define CB_COUNT 3   // minimize, maximize/restore, close
 
-// Draw a caption glyph as thin strokes inside the box [gx,gy,gsz]. btn: 0
-// minimize, 1 maximize/restore, 2 close. Matches the Windows caption glyphs:
-// a middle bar, a square outline (two offset squares when maximized), an X.
+// Draw a polyline through unit-box fractions [0,1] mapped into [gx,gy,gsz].
+static void cbPolyline(void* g, void* pen, int gx, int gy, int gsz, const float* p, int n) {
+    for (int k = 0; k + 1 < n; k++) {
+        int ax = gx + (int)(p[2*k]     * gsz + 0.5f), ay = gy + (int)(p[2*k+1] * gsz + 0.5f);
+        int bx = gx + (int)(p[2*k+2]   * gsz + 0.5f), by = gy + (int)(p[2*k+3] * gsz + 0.5f);
+        GdipDrawLineI(g, pen, ax, ay, bx, by);
+    }
+}
+
+// Draw a caption glyph as thin strokes inside the box [gx,gy,gsz], using the
+// exact vector geometry WezTerm uses for its Windows-style caption buttons
+// (wezterm-gui .../render/window_buttons.rs). btn: 0 minimize, 1 maximize/
+// restore, 2 close. minimize = bar at y=0.6; maximize = octagon (square with
+// clipped corners); restore = two clipped squares; close = X.
 static void cbDrawGlyph(void* g, int btn, bool maximized, int gx, int gy, int gsz, unsigned int argb, float penw) {
     void* pen = NULL;
     if (GdipCreatePen1(argb, penw, 2 /* UnitPixel */, &pen) != 0) return;
-    int x0 = gx, y0 = gy, x1 = gx + gsz, y1 = gy + gsz;
-    if (btn == 0) {                         // minimize: horizontal bar
-        int my = gy + gsz / 2;
-        GdipDrawLineI(g, pen, x0, my, x1, my);
-    } else if (btn == 1 && !maximized) {    // maximize: single square
-        GdipDrawRectangleI(g, pen, x0, y0, gsz - 1, gsz - 1);
-    } else if (btn == 1) {                  // restore: two offset squares
-        int o = (gsz * 3) / 10, s = gsz - o;
-        GdipDrawRectangleI(g, pen, x0, y0 + o, s - 1, s - 1);   // front (lower-left)
-        GdipDrawRectangleI(g, pen, x0 + o, y0, s - 1, s - 1);   // back  (upper-right)
-    } else {                                // close: X
-        GdipDrawLineI(g, pen, x0, y0, x1, y1);
-        GdipDrawLineI(g, pen, x1, y0, x0, y1);
+    GdipSetPenStartCap(pen, 2 /* LineCapRound */);
+    GdipSetPenEndCap(pen, 2 /* LineCapRound */);
+    if (btn == 0) {                              // minimize: horizontal bar at 0.6
+        static const float hide[] = { 0.f,0.6f, 1.f,0.6f };
+        cbPolyline(g, pen, gx, gy, gsz, hide, 2);
+    } else if (btn == 1 && !maximized) {         // maximize: clipped-corner square
+        static const float max_[] = {
+            0.2f,0.1f, 0.9f,0.1f, 1.0f,0.2f, 1.0f,0.9f, 0.9f,1.0f,
+            0.2f,1.0f, 0.1f,0.9f, 0.1f,0.2f, 0.2f,0.1f };
+        cbPolyline(g, pen, gx, gy, gsz, max_, 9);
+    } else if (btn == 1) {                       // restore: two clipped squares
+        static const float back[]  = { 0.25f,0.1f, 0.8f,0.1f, 1.0f,0.3f, 1.0f,0.75f };
+        static const float front[] = {
+            0.2f,0.3f, 0.7f,0.3f, 0.8f,0.4f, 0.8f,0.9f, 0.7f,1.0f,
+            0.2f,1.0f, 0.1f,0.9f, 0.1f,0.4f, 0.2f,0.3f };
+        cbPolyline(g, pen, gx, gy, gsz, back, 4);
+        cbPolyline(g, pen, gx, gy, gsz, front, 9);
+    } else {                                     // close: X
+        static const float d1[] = { 0.f,0.f, 1.f,1.f };
+        static const float d2[] = { 1.f,0.f, 0.f,1.f };
+        cbPolyline(g, pen, gx, gy, gsz, d1, 2);
+        cbPolyline(g, pen, gx, gy, gsz, d2, 2);
     }
     GdipDeletePen(pen);
 }
